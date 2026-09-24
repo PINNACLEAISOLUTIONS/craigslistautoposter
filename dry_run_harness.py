@@ -5,7 +5,7 @@ from rich.console import Console
 from rich.table import Table
 
 from config.settings import load_config
-from payload.models import PostPayload, PostAttributes
+from payload.models import PostPayload, PostAttributes, AccountCredentials
 from payload.spintax import SpintaxParser
 from workers.poster import CraigslistPosterWorker
 

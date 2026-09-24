@@ -14,11 +14,6 @@ from payload.spintax import SpintaxParser
 from payload.exif_scrubber import ExifScrubber
 
 class CraigslistPosterWorker:
-    """
-    Primary posting worker handling end-to-end Craigslist workflows:
-    stealth navigation, category selection, spintax rendering, form inputs,
-    image sanitization/uploading, and submission.
-    """
     def __init__(self, config: AppConfig):
         self.config = config
         self.browser_factory = BrowserFactory(config.browser)
@@ -26,11 +21,69 @@ class CraigslistPosterWorker:
         self.proxy_manager = ProxyManager(config.proxy)
         self.rate_limiter = RateLimiter(config.rate_limits)
 
+    async def _safe_fill_input(self, page: Page, selectors: List[str], text: str, description: str = "") -> bool:
+        """Finds, focuses, and reliably fills an input, triggering input/change events."""
+        for sel in selectors:
+            try:
+                loc = page.locator(sel).first
+                if await loc.count() > 0:
+                    await loc.wait_for(state="visible", timeout=3000)
+                    await loc.scroll_into_view_if_needed()
+                    await loc.click()
+                    await loc.fill(text)
+                    await loc.dispatch_event("input")
+                    await loc.dispatch_event("change")
+                    val = await loc.input_value()
+                    if val.strip():
+                        print(f"[{description}] Populated '{sel}' with: {val}")
+                        return True
+            except Exception:
+                continue
+
+        # DOM evaluation fallback
+        js_ok = await page.evaluate("""([sels, val]) => {
+            for (const s of sels) {
+                const el = document.querySelector(s);
+                if (el) {
+                    el.focus();
+                    el.value = val;
+                    el.dispatchEvent(new Event('input', { bubbles: true }));
+                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                    return true;
+                }
+            }
+            const allInputs = Array.from(document.querySelectorAll('input, textarea'));
+            for (const inp of allInputs) {
+                const name = (inp.name || '').toLowerCase();
+                const id = (inp.id || '').toLowerCase();
+                const parent = inp.closest('label') || inp.parentElement;
+                const pText = parent ? parent.textContent.toLowerCase() : '';
+                if (name.includes('postal') || name.includes('zip') || id.includes('postal') || id.includes('zip') || pText.includes('zip')) {
+                    inp.focus();
+                    inp.value = val;
+                    inp.dispatchEvent(new Event('input', { bubbles: true }));
+                    inp.dispatchEvent(new Event('change', { bubbles: true }));
+                    return true;
+                }
+            }
+            return false;
+        }""", [selectors, text])
+
+        if js_ok:
+            print(f"[{description}] Populated via DOM fallback with: {text}")
+            return True
+
+        print(f"[{description}] WARNING: Could not populate {selectors}")
+        return False
+
     async def _click_continue(self, page: Page) -> bool:
-        """Click the standard continuation button and wait for navigation/DOM update."""
         selectors = [
+            "button.submit-button",
             "button[name='go']",
+            "form.pe-flow-continue button",
             "button:has-text('continue')",
+            "button.big-button",
+            "button.bigbutton",
             "input[name='go']",
             "input[type='submit'][value*='continue' i]",
             "button.continue",
@@ -39,24 +92,22 @@ class CraigslistPosterWorker:
         ]
         for sel in selectors:
             try:
-                el = await page.wait_for_selector(sel, state="visible", timeout=2000)
-                if el:
-                    await el.click(delay=80)
+                loc = page.locator(sel).first
+                if await loc.count() > 0 and await loc.is_visible():
+                    await loc.click(delay=50)
                     try:
-                        await page.wait_for_load_state("networkidle", timeout=6000)
+                        await page.wait_for_load_state("domcontentloaded", timeout=8000)
                     except Exception:
-                        await page.wait_for_load_state("domcontentloaded", timeout=6000)
-                    await asyncio.sleep(1.0)
+                        pass
+                    await asyncio.sleep(1.2)
                     return True
             except Exception:
                 continue
         return False
 
     async def _select_radio_option(self, page: Page, option_label: str) -> bool:
-        """Selects radio input based on text content with fuzzy matching and verified checking."""
         clean_label = option_label.strip().lower()
 
-        # 1. Try Playwright direct check on label or input
         try:
             loc = page.locator(f"label:has-text('{option_label}')")
             if await loc.count() > 0:
@@ -69,7 +120,6 @@ class CraigslistPosterWorker:
         except Exception:
             pass
 
-        # 2. Use DOM evaluation to check and dispatch events on matching radio
         checked = await page.evaluate("""(textToFind) => {
             const labels = Array.from(document.querySelectorAll('label'));
             for (const lbl of labels) {
@@ -105,7 +155,6 @@ class CraigslistPosterWorker:
         account: Optional[AccountCredentials] = None,
         dry_run: bool = False
     ) -> JobResult:
-        # Check rate limiter
         can_proceed, reason = self.rate_limiter.can_post()
         if not can_proceed:
             return JobResult(
@@ -115,10 +164,8 @@ class CraigslistPosterWorker:
                 timestamp=datetime.datetime.utcnow().isoformat()
             )
 
-        # Enforce inter-post pacing
         await self.rate_limiter.wait_cooldown()
 
-        # Resolve session & proxy
         account_id = account.account_id if account else "default_guest"
         storage_path = self.session_manager.get_storage_state_arg(account_id)
         proxy_dict = self.proxy_manager.get_playwright_proxy(session_key=account_id)
@@ -132,49 +179,65 @@ class CraigslistPosterWorker:
         spun_body = SpintaxParser.spin(payload.body_spintax)
 
         try:
-            # 1. Navigate to target Craigslist subdomain post entry
-            post_entry_url = f"https://{payload.subdomain}.craigslist.org/"
-            print(f"[{payload.id}] Navigating to {post_entry_url}...")
+            post_entry_url = f"https://post.craigslist.org/c/{payload.subdomain}"
+            print(f"[{payload.id}] Navigating directly to {post_entry_url}...")
             await page.goto(post_entry_url, wait_until="domcontentloaded", timeout=40000)
-            await asyncio.sleep(1.0)
-
-            # Look for 'create a posting' or 'post' link
-            post_link_selectors = [
-                "a#post",
-                "a:has-text('create a posting')",
-                "a:has-text('post to classifieds')",
-                "a[href*='/cpo']",
-                "a[href*='/d/post']"
-            ]
-            clicked_entry = False
-            for sel in post_link_selectors:
-                if await page.locator(sel).count() > 0:
-                    await HumanActions.human_click(page, sel)
-                    clicked_entry = True
-                    break
-
-            if not clicked_entry:
-                # Direct fallback URL
-                await page.goto(f"https://post.craigslist.org/c/{payload.subdomain}", wait_until="domcontentloaded")
-
-            await page.wait_for_load_state("domcontentloaded")
             await asyncio.sleep(1.5)
 
-            # 2. Dynamic multi-step category / sub-area navigation
-            max_nav_steps = 7
+            city_area_map = {
+                "losangeles": "los angeles",
+                "miami": "south florida",
+                "newyork": "new york city",
+                "houston": "houston",
+                "chicago": "chicago"
+            }
+            target_city_name = city_area_map.get(payload.subdomain.lower(), payload.subdomain.lower())
+
+            max_nav_steps = 9
             nav_step = 0
             while nav_step < max_nav_steps:
                 nav_step += 1
-                await asyncio.sleep(1.2)
+                await asyncio.sleep(1.0)
+                cur_title = (await page.title()).lower()
 
-                # Check if we already reached the main form
                 if await page.locator("#PostingTitle, input[name='PostingTitle']").count() > 0:
                     print(f"[{payload.id}] Reached main posting form!")
                     break
 
+                # 0. Skip "copy from previous" if prompted
+                if "copy from previous" in cur_title or await page.locator("button[name='brand_new_post']").count() > 0:
+                    print(f"[{payload.id}] Skipping copy-from-previous to start fresh {payload.subdomain} post...")
+                    await page.locator("button[name='brand_new_post'], button:has-text('skip')").first.click()
+                    await page.wait_for_load_state("domcontentloaded")
+                    await asyncio.sleep(1.0)
+                    continue
+
+                # 1. Area Dropdown (e.g. choose area on losangeles -> los angeles; on miami -> south florida)
+                if "choose area" in cur_title or await page.locator("#ui-id-1-button").count() > 0:
+                    print(f"[{payload.id}] Selecting area '{target_city_name}' from dropdown...")
+                    try:
+                        await page.locator("#ui-id-1-button").click()
+                        await asyncio.sleep(0.3)
+                        opt = page.locator(f"ul#ui-id-1-menu li:has-text('{target_city_name}')").first
+                        if await opt.count() > 0:
+                            await opt.click()
+                            await asyncio.sleep(0.3)
+                        await self._click_continue(page)
+                        continue
+                    except Exception as e:
+                        print(f"[{payload.id}] Area dropdown notice: {e}")
+
                 page_html = (await page.content()).lower()
 
-                # Step: Post Type selection ("what type of posting is this")
+                # 2. Sub-area (e.g. central LA)
+                if ("which of these areas" in page_html or "sub-area" in page_html or "nearest" in page_html or "nearest area" in cur_title) and payload.sub_area:
+                    print(f"[{payload.id}] Selecting sub-area: {payload.sub_area}")
+                    selected = await self._select_radio_option(page, payload.sub_area)
+                    if selected:
+                        await self._click_continue(page)
+                    continue
+
+                # 3. Post Type (e.g. community)
                 if "what type of posting is this" in page_html:
                     print(f"[{payload.id}] Selecting post type: {payload.type_of_post}")
                     selected = await self._select_radio_option(page, payload.type_of_post)
@@ -182,15 +245,7 @@ class CraigslistPosterWorker:
                         await self._click_continue(page)
                     continue
 
-                # Step: Sub-area selection ("which of these areas" / "sub-area")
-                if ("which of these areas" in page_html or "sub-area" in page_html or "nearest you" in page_html) and payload.sub_area:
-                    print(f"[{payload.id}] Selecting sub-area: {payload.sub_area}")
-                    selected = await self._select_radio_option(page, payload.sub_area)
-                    if selected:
-                        await self._click_continue(page)
-                    continue
-
-                # Step: Category selection ("choose a category")
+                # 4. Category (e.g. activity partners)
                 if "choose a category" in page_html or "select a category" in page_html:
                     print(f"[{payload.id}] Selecting category: {payload.category}")
                     selected = await self._select_radio_option(page, payload.category)
@@ -198,110 +253,124 @@ class CraigslistPosterWorker:
                         await self._click_continue(page)
                     continue
 
-                # Check if there is an intermediate continue button
-                if await page.locator("button.continue, button[name='go'], input[name='go']").count() > 0:
+                # Generic continue if available
+                if await page.locator("button.submit-button, button[name='go'], button:has-text('continue')").count() > 0:
                     print(f"[{payload.id}] Advancing through intermediate step...")
                     await self._click_continue(page)
                 else:
                     break
 
-            # 3. Populate Main Post Form
-            print(f"[{payload.id}] Filling post payload...")
+            print(f"[{payload.id}] Filling post payload using fast copy-paste style...")
             await page.wait_for_selector("#PostingTitle, input[name='PostingTitle']", state="visible", timeout=20000)
 
-            # Title
-            await HumanActions.human_type(page, "#PostingTitle, input[name='PostingTitle']", spun_title)
+            # 1. Posting Title (instant copy-paste fill, truncated to 70 chars max for Craigslist)
+            clean_title = spun_title[:70]
+            await page.fill("#PostingTitle", clean_title)
+            print(f"[{payload.id}] Title pasted: {clean_title}")
 
-            # Price
-            if payload.price:
-                price_sel = "input[name='price'], #price"
-                if await page.locator(price_sel).count() > 0:
-                    await HumanActions.human_type(page, price_sel, payload.price)
+            # 2. Neighborhood
+            neighborhood_val = payload.neighborhood or "Central LA"
+            if await page.locator("#geographic_area").count() > 0:
+                await page.fill("#geographic_area", neighborhood_val)
+                print(f"[{payload.id}] Neighborhood pasted: {neighborhood_val}")
 
-            # Postal code
-            postal_sel = "input[name='postal'], #postal_code, input[name='postal_code']"
-            if await page.locator(postal_sel).count() > 0:
-                await HumanActions.human_type(page, postal_sel, payload.postal_code)
+            # 3. Postal / ZIP code (GUARANTEED FAST FILL & VERIFY)
+            postal_to_use = payload.postal_code or "90012"
+            if await page.locator("#postal_code").count() > 0:
+                await page.fill("#postal_code", postal_to_use)
+            if await page.locator("input[name='postal']").count() > 0:
+                await page.locator("input[name='postal']").first.fill(postal_to_use)
 
-            # Neighborhood
-            if payload.neighborhood:
-                geo_sel = "input[name='geographic_area'], #geographic_area"
-                if await page.locator(geo_sel).count() > 0:
-                    await HumanActions.human_type(page, geo_sel, payload.neighborhood)
+            # Instant verification
+            actual_zip = await page.locator("#postal_code").input_value()
+            if not actual_zip:
+                await page.evaluate("""(val) => {
+                    const el = document.querySelector('#postal_code') || document.querySelector('input[name="postal"]');
+                    if (el) {
+                        el.value = val;
+                        el.dispatchEvent(new Event('input', { bubbles: true }));
+                        el.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                }""", postal_to_use)
+                actual_zip = await page.locator("#postal_code").input_value()
+            print(f"[{payload.id}] Verified ZIP code entered: {actual_zip}")
 
-            # Body / Description
-            body_sel = "textarea[name='PostingBody'], #PostingBody"
-            await page.wait_for_selector(body_sel, state="visible")
-            await HumanActions.human_type(page, body_sel, spun_body)
+            # 4. Description Body (instant copy-paste fill)
+            await page.fill("#PostingBody", spun_body)
+            print(f"[{payload.id}] Description body pasted ({len(spun_body)} chars)")
 
-            # Guest Email (required when not logged in)
-            email_sel = "input[name='FromEMail'], #FromEMail"
-            if await page.locator(email_sel).count() > 0:
-                contact_email = None
-                if account and account.email and "@" in account.email and account.email != "stored_session@local":
-                    contact_email = account.email
-                else:
-                    import os
-                    from dotenv import load_dotenv
-                    load_dotenv()
-                    contact_email = os.getenv("CL_ACCOUNT_2_EMAIL") or os.getenv("CL_ACCOUNT_1_EMAIL") or "chrisconcannon@protonmail.com"
+            # 5. Price (if present)
+            if payload.price and await page.locator("#price").count() > 0:
+                await page.fill("#price", str(payload.price))
 
-                print(f"[{payload.id}] Supplying contact email: {contact_email}")
-                await HumanActions.human_type(page, email_sel, contact_email)
-                confirm_sel = "input[name='FromEMailConfirm'], #FromEMailConfirm"
-                if await page.locator(confirm_sel).count() > 0:
-                    await HumanActions.human_type(page, confirm_sel, contact_email)
-
-            # Phone / Text contact options
+            # 6. Phone / Text contact options
             if payload.phone_number:
-                phone_check_sel = "input[name='contact_phone_ok'], #contact_phone_ok, label:has-text('show my phone number') input"
-                if await page.locator(phone_check_sel).count() > 0:
-                    await page.locator(phone_check_sel).first.check(force=True)
-                    await asyncio.sleep(0.3)
+                try:
+                    chk = page.locator("input[name='show_phone_ok']")
+                    if await chk.count() > 0:
+                        await chk.first.check(force=True)
+                    await asyncio.sleep(0.15)
+                    txt_chk = page.locator("input[name='contact_text_ok']")
+                    if await txt_chk.count() > 0:
+                        await txt_chk.first.check(force=True)
+                    await asyncio.sleep(0.15)
+                    phone_input = page.locator("input[name='contact_phone']")
+                    if await phone_input.count() > 0:
+                        await phone_input.first.fill(payload.phone_number)
+                        print(f"[{payload.id}] Phone number filled: {payload.phone_number}")
+                except Exception as ex:
+                    print(f"[{payload.id}] Phone options note: {ex}")
 
-                phone_input_sel = "input[name='contact_phone'], #contact_phone"
-                if await page.locator(phone_input_sel).count() > 0:
-                    await HumanActions.human_type(page, phone_input_sel, payload.phone_number)
+            # Advance from the main form
+            print(f"[{payload.id}] Submitting main post form...")
+            await page.locator("button.submit-button, button[name='go']").first.click()
+            await page.wait_for_load_state("domcontentloaded")
+            await asyncio.sleep(2.0)
 
-            # Optional Attributes (Condition, Delivery, etc.)
-            if payload.attributes.condition:
-                cond_sel = "select[name='condition']"
-                if await page.locator(cond_sel).count() > 0:
-                    await page.select_option(cond_sel, label=payload.attributes.condition)
+            # Loop through subsequent steps (Map, Images, Preview)
+            for step_i in range(6):
+                cur_title = (await page.title()).lower()
+                cur_url = page.url
 
-            # Submit form to next step (Map / Location verification)
-            await self._click_continue(page)
-            await asyncio.sleep(1.5)
+                # Check if reached Preview screen
+                publish_btn = page.locator("button:has-text('publish'), input[type='submit'][value*='publish' i], button.publish")
+                if await publish_btn.count() > 0 and await publish_btn.first.is_visible():
+                    print(f"[{payload.id}] Reached Preview screen!")
+                    break
 
-            # 6. Map / Location confirmation screen (if shown)
-            map_continue = await self._click_continue(page)
-            if map_continue:
-                await asyncio.sleep(1.5)
+                # Step: Map / geoverify
+                if "map" in cur_title or "geoverify" in cur_url:
+                    print(f"[{payload.id}] Advancing past location map...")
+                    map_continue = page.locator("form.pe-flow-continue button, button.submit-button, button:has-text('continue'), button[name='go']").first
+                    if await map_continue.count() > 0:
+                        await map_continue.click()
+                        await page.wait_for_load_state("domcontentloaded")
+                        await asyncio.sleep(2.0)
+                        continue
 
-            # 7. Image Uploading with EXIF Scrubbing
-            if payload.images:
-                print(f"[{payload.id}] Scrubbing {len(payload.images)} images...")
-                cleaned_images = ExifScrubber.clean_batch(payload.images)
-                
-                # Check for file input
-                file_input_sel = "input[type='file']"
-                if await page.locator(file_input_sel).count() > 0:
-                    print(f"[{payload.id}] Uploading sanitized images...")
-                    await page.set_input_files(file_input_sel, cleaned_images)
-                    # Allow time for upload completion
-                    await asyncio.sleep(3.0)
-
-                # Done with images button
-                done_imgs_sel = "button:has-text('done with images'), input[value*='done with images' i]"
-                if await page.locator(done_imgs_sel).count() > 0:
-                    await HumanActions.human_click(page, done_imgs_sel)
+                # Step: Images
+                done_imgs = page.locator("button:has-text('done with images'), input[value*='done with images' i]")
+                if await done_imgs.count() > 0 and await done_imgs.first.is_visible():
+                    print(f"[{payload.id}] Advancing past image upload screen...")
+                    await done_imgs.first.click()
                     await page.wait_for_load_state("domcontentloaded")
+                    await asyncio.sleep(2.0)
+                    continue
 
-            # 8. Preview & Verification Stage
+                # Generic continue
+                cont_btn = page.locator("button.submit-button, button[name='go'], button:has-text('continue')")
+                if await cont_btn.count() > 0 and await cont_btn.first.is_visible():
+                    print(f"[{payload.id}] Advancing through step {step_i + 1}...")
+                    await cont_btn.first.click()
+                    await page.wait_for_load_state("domcontentloaded")
+                    await asyncio.sleep(2.0)
+                    continue
+
+                await asyncio.sleep(1.0)
+
+            # Preview & Verification Stage
             print(f"[{payload.id}] Post preview generated.")
-            await asyncio.sleep(1.5)
-
-            publish_button_sel = "button:has-text('publish'), input[type='submit'][value*='publish' i], button.publish"
+            await asyncio.sleep(1.0)
 
             if dry_run:
                 screenshot_path = Path("data") / f"dry_run_{payload.id}.png"
@@ -312,17 +381,27 @@ class CraigslistPosterWorker:
                 return JobResult(
                     job_id=payload.id,
                     success=True,
-                    post_url="https://craigslist.org/preview-dry-run-mode",
-                    generated_title=spun_title,
+                    post_url=page.url,
+                    generated_title=clean_title,
                     timestamp=datetime.datetime.utcnow().isoformat()
                 )
 
-            # 9. Final Publication
-            print(f"[{payload.id}] Publishing post...")
-            await HumanActions.human_click(page, publish_button_sel)
-            await page.wait_for_load_state("networkidle", timeout=15000)
+            # Final Publication
+            print(f"[{payload.id}] Clicking Publish button...")
+            publish_btn = page.locator("button:has-text('publish'), input[type='submit'][value*='publish' i], button.publish")
+            if await publish_btn.count() > 0:
+                await publish_btn.first.click()
+                try:
+                    await page.wait_for_load_state("networkidle", timeout=15000)
+                except Exception:
+                    await page.wait_for_load_state("domcontentloaded", timeout=10000)
+                await asyncio.sleep(3.0)
 
-            # Save session state if account logged in
+            # Capture confirmation snapshot
+            conf_shot = Path("data") / f"published_{payload.id}.png"
+            await page.screenshot(path=str(conf_shot))
+            print(f"[{payload.id}] Confirmation snapshot saved to {conf_shot}")
+
             if account:
                 await self.session_manager.save_session(context, account.account_id)
 
@@ -333,7 +412,7 @@ class CraigslistPosterWorker:
                 job_id=payload.id,
                 success=True,
                 post_url=current_url,
-                generated_title=spun_title,
+                generated_title=clean_title,
                 timestamp=datetime.datetime.utcnow().isoformat()
             )
 

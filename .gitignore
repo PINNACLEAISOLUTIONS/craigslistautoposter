@@ -42,3 +42,11 @@ playwright-report/
 *.swp
 .DS_Store
 Thumbs.db
+
+# Debug & Temporary Runs
+data/*.png
+data/*.html
+test_*.py
+inspect_*.py
+scratch_*.py
+check_*.py

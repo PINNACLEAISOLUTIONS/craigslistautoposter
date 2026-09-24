@@ -25,9 +25,6 @@ COMMON_USER_AGENTS = [
 ]
 
 class BrowserFactory:
-    """
-    Spawns stealth-configured Playwright browsers with human-like interaction heuristics.
-    """
     def __init__(self, config: Optional[BrowserConfig] = None):
         self.config = config or BrowserConfig()
         self._playwright = None
@@ -79,11 +76,9 @@ class BrowserFactory:
         context = await self._browser.new_context(**context_kwargs)
         page = await context.new_page()
 
-        # Apply stealth scripts
         if stealth_async:
             await stealth_async(page)
         else:
-            # Fallback inline anti-detect evasions
             await page.add_init_script("""
                 Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
                 window.chrome = { runtime: {} };
@@ -101,57 +96,53 @@ class BrowserFactory:
 
 
 class HumanActions:
-    """
-    Simulates organic human interaction: typing with jitter, bezier curve mouse movement.
-    """
     @staticmethod
     async def human_type(page: Page, selector: str, text: str, min_delay: int = 40, max_delay: int = 120):
-        """Types string character by character with randomized inter-key pauses."""
-        element = await page.wait_for_selector(selector, state="visible", timeout=10000)
-        await element.click()
-        await asyncio.sleep(random.uniform(0.1, 0.3))
+        loc = page.locator(selector).first
+        await loc.wait_for(state="visible", timeout=12000)
+        try:
+            await loc.click()
+        except Exception:
+            pass
+        await asyncio.sleep(random.uniform(0.1, 0.2))
 
         for char in text:
             await page.keyboard.type(char)
             delay = random.uniform(min_delay / 1000.0, max_delay / 1000.0)
-            # Occasional pause representing thinking / hesitation
             if char in (" ", ",", "."):
-                delay += random.uniform(0.08, 0.25)
+                delay += random.uniform(0.04, 0.12)
             await asyncio.sleep(delay)
 
     @staticmethod
-    async def organic_mouse_move(page: Page, target_x: float, target_y: float, steps: int = 15):
-        """Moves mouse across an organic curved path with jitter to simulate human hand."""
+    async def organic_mouse_move(page: Page, target_x: float, target_y: float, steps: int = 12):
         start_x = random.randint(100, 300)
         start_y = random.randint(100, 300)
 
         for i in range(steps + 1):
             t = i / steps
-            # Quadratic bezier interpolation with randomized control point
-            ctrl_x = (start_x + target_x) / 2 + random.uniform(-40, 40)
-            ctrl_y = (start_y + target_y) / 2 + random.uniform(-40, 40)
+            ctrl_x = (start_x + target_x) / 2 + random.uniform(-30, 30)
+            ctrl_y = (start_y + target_y) / 2 + random.uniform(-30, 30)
 
             cur_x = (1 - t)**2 * start_x + 2 * (1 - t) * t * ctrl_x + t**2 * target_x
             cur_y = (1 - t)**2 * start_y + 2 * (1 - t) * t * ctrl_y + t**2 * target_y
-
-            # Micro-jitter
-            cur_x += random.uniform(-1.5, 1.5)
-            cur_y += random.uniform(-1.5, 1.5)
+            cur_x += random.uniform(-1, 1)
+            cur_y += random.uniform(-1, 1)
 
             await page.mouse.move(cur_x, cur_y)
-            await asyncio.sleep(random.uniform(0.008, 0.025))
+            await asyncio.sleep(random.uniform(0.005, 0.015))
 
     @classmethod
     async def human_click(cls, page: Page, selector: str):
-        """Moves cursor organically to selector and clicks with brief hold."""
-        el = await page.wait_for_selector(selector, state="visible", timeout=12000)
-        box = await el.bounding_box()
-        if box:
-            target_x = box["x"] + box["width"] * random.uniform(0.3, 0.7)
-            target_y = box["y"] + box["height"] * random.uniform(0.3, 0.7)
-            await cls.organic_mouse_move(page, target_x, target_y)
-            await asyncio.sleep(random.uniform(0.05, 0.15))
-            await el.click(delay=random.randint(60, 150))
-        else:
-            await el.click()
-        await asyncio.sleep(random.uniform(0.2, 0.5))
+        loc = page.locator(selector).first
+        try:
+            await loc.wait_for(state="visible", timeout=12000)
+            box = await loc.bounding_box()
+            if box:
+                target_x = box["x"] + box["width"] * random.uniform(0.3, 0.7)
+                target_y = box["y"] + box["height"] * random.uniform(0.3, 0.7)
+                await cls.organic_mouse_move(page, target_x, target_y)
+                await asyncio.sleep(random.uniform(0.05, 0.12))
+            await loc.click(delay=random.randint(50, 100))
+        except Exception:
+            await loc.click(force=True)
+        await asyncio.sleep(random.uniform(0.2, 0.4))
