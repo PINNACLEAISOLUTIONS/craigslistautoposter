@@ -68,9 +68,23 @@ async def run_dry_run_test(headless: bool = False):
     console.print(summary_table)
 
     worker = CraigslistPosterWorker(cfg)
+    
+    # Check if an authenticated session exists
+    account_obj = None
+    sessions = list((Path("data") / "sessions").glob("*_state.json"))
+    if sessions:
+        account_name = sessions[0].stem.replace("_state", "")
+        account_obj = AccountCredentials(
+            account_id=account_name,
+            email="stored_session@local"
+        )
+        console.print(f"[bold green]Loaded authenticated session: {sessions[0].name}[/bold green]")
+    else:
+        console.print("[yellow]Notice: Running without saved session (guest mode). Run 'python save_session.py' to authenticate.[/yellow]")
+
     console.print("\n[bold green]Launching browser and executing form navigation...[/bold green]")
     
-    result = await worker.execute_post(payload, dry_run=True)
+    result = await worker.execute_post(payload, account=account_obj, dry_run=True)
 
     result_table = Table(title="Dry-Run Execution Outcome")
     result_table.add_column("Property", style="cyan")
