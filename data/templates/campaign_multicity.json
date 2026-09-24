@@ -1,0 +1,61 @@
+{
+  "campaign_name": "silver_rose_recruitment",
+  "pacing_seconds": 90,
+  "default_contact": {
+    "phone": "(617) 792-8254",
+    "contact_method": "text_or_email_relay"
+  },
+  "content": {
+    "title_spintax": "{Silver Rose Management — Recruiting Women & Trans Women OnlyFans Creators|Silver Rose Management: Seeking Women & Trans Women OnlyFans Creators|Creator Management Agency — Recruiting Women & Trans Women (OnlyFans)}",
+    "body_spintax": "Silver Rose Management is a Boston-based creator management agency seeking new and established women creators, including trans women, who are 18 or older and ready to grow their OnlyFans businesses.\n\nOur services include account setup and management, content planning, editing, cross-platform publishing, trend strategy, specialized automation software, consent-based AI content enhancement, content repurposing, suspension-recovery assistance, fan messaging, and sales optimization.\n\nTo apply, please send:\n\n• First name\n• Confirmation that you are 18+\n• City\n• OnlyFans experience level (if any)\n• A public social-media username (if any)\n\nAll inquiries are handled professionally and confidentially.\n\nAll the best,\n\nChris\nSilver Rose Management\n\nText: (617) 792-8254"
+  },
+  "targets": [
+    {
+      "city": "Los Angeles",
+      "subdomain": "losangeles",
+      "postal_code": "90012",
+      "neighborhood": "Central LA",
+      "categories": ["activity partners", "general community"],
+      "sub_areas": [
+        "westside-southbay-310",
+        "san fernando valley",
+        "central LA 213/323",
+        "san gabriel valley",
+        "long beach / 562",
+        "antelope valley"
+      ]
+    },
+    {
+      "city": "Miami",
+      "subdomain": "miami",
+      "postal_code": "33101",
+      "neighborhood": "Downtown",
+      "categories": ["activity partners", "general community"],
+      "sub_areas": ["miami / dade", "broward county", "palm beach county"]
+    },
+    {
+      "city": "New York City",
+      "subdomain": "newyork",
+      "postal_code": "10001",
+      "neighborhood": "Manhattan",
+      "categories": ["activity partners", "general community"],
+      "sub_areas": ["manhattan", "brooklyn", "queens", "bronx", "staten island"]
+    },
+    {
+      "city": "Houston",
+      "subdomain": "houston",
+      "postal_code": "77002",
+      "neighborhood": "Downtown",
+      "categories": ["activity partners", "general community"],
+      "sub_areas": []
+    },
+    {
+      "city": "Chicago",
+      "subdomain": "chicago",
+      "postal_code": "60601",
+      "neighborhood": "Loop",
+      "categories": ["activity partners", "general community"],
+      "sub_areas": ["city of chicago", "north chicagoland", "south chicagoland", "west chicagoland"]
+    }
+  ]
+}
