@@ -26,64 +26,78 @@ class CraigslistPosterWorker:
         self.proxy_manager = ProxyManager(config.proxy)
         self.rate_limiter = RateLimiter(config.rate_limits)
 
-    async def _click_continue(self, page: Page):
-        """Click the standard continuation button with multi-selector fallback."""
+    async def _click_continue(self, page: Page) -> bool:
+        """Click the standard continuation button and wait for navigation/DOM update."""
         selectors = [
-            "button:has-text('continue')",
             "button[name='go']",
+            "button:has-text('continue')",
+            "input[name='go']",
             "input[type='submit'][value*='continue' i]",
             "button.continue",
-            "input[name='go']",
-            "button[type='submit']"
+            "button[type='submit']",
+            "input[type='submit']"
         ]
         for sel in selectors:
             try:
-                el = await page.wait_for_selector(sel, state="visible", timeout=2500)
+                el = await page.wait_for_selector(sel, state="visible", timeout=2000)
                 if el:
-                    await HumanActions.human_click(page, sel)
-                    await page.wait_for_load_state("domcontentloaded", timeout=10000)
+                    await el.click(delay=80)
+                    try:
+                        await page.wait_for_load_state("networkidle", timeout=6000)
+                    except Exception:
+                        await page.wait_for_load_state("domcontentloaded", timeout=6000)
+                    await asyncio.sleep(1.0)
                     return True
             except Exception:
                 continue
         return False
 
     async def _select_radio_option(self, page: Page, option_label: str) -> bool:
-        """Selects radio input based on text content with fuzzy XPath and CSS fallbacks."""
+        """Selects radio input based on text content with fuzzy matching and verified checking."""
         clean_label = option_label.strip().lower()
-        
-        # Candidate selector strategies
-        candidates = [
-            f"label:has-text('{option_label}')",
-            f"xpath=//label[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '{clean_label}')]",
-            f"xpath=//li[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '{clean_label}')]//input[@type='radio']",
-            f"xpath=//label[contains(., '{option_label}')]/input[@type='radio']",
-            f"input[type='radio'][value*='{clean_label[:3]}']"
-        ]
 
-        for sel in candidates:
-            try:
-                el = await page.wait_for_selector(sel, state="visible", timeout=2000)
-                if el:
-                    await el.click()
+        # 1. Try Playwright direct check on label or input
+        try:
+            loc = page.locator(f"label:has-text('{option_label}')")
+            if await loc.count() > 0:
+                radio = loc.locator("input[type='radio']")
+                if await radio.count() > 0:
+                    await radio.first.check(force=True)
                     await asyncio.sleep(0.3)
-                    return True
-            except Exception:
-                continue
+                    if await radio.first.is_checked():
+                        return True
+        except Exception:
+            pass
 
-        # If radio button didn't click directly, try evaluating in DOM
-        clicked = await page.evaluate("""(textToFind) => {
-            const labels = Array.from(document.querySelectorAll('label, li'));
-            for (const el of labels) {
-                if (el.textContent.toLowerCase().includes(textToFind)) {
-                    const radio = el.querySelector('input[type="radio"]') || el;
-                    radio.click();
+        # 2. Use DOM evaluation to check and dispatch events on matching radio
+        checked = await page.evaluate("""(textToFind) => {
+            const labels = Array.from(document.querySelectorAll('label'));
+            for (const lbl of labels) {
+                if (lbl.textContent.toLowerCase().includes(textToFind)) {
+                    const radio = lbl.querySelector('input[type="radio"]') || document.getElementById(lbl.getAttribute('for'));
+                    if (radio) {
+                        radio.checked = true;
+                        radio.dispatchEvent(new Event('change', { bubbles: true }));
+                        radio.dispatchEvent(new Event('click', { bubbles: true }));
+                        return true;
+                    }
+                }
+            }
+            const radios = Array.from(document.querySelectorAll('input[type="radio"]'));
+            for (const r of radios) {
+                const parent = r.closest('label') || r.parentElement;
+                if (parent && parent.textContent.toLowerCase().includes(textToFind)) {
+                    r.checked = true;
+                    r.dispatchEvent(new Event('change', { bubbles: true }));
+                    r.dispatchEvent(new Event('click', { bubbles: true }));
                     return true;
                 }
             }
             return false;
         }""", clean_label)
 
-        return clicked
+        await asyncio.sleep(0.4)
+        return checked
 
     async def execute_post(
         self,
@@ -146,28 +160,54 @@ class CraigslistPosterWorker:
             await page.wait_for_load_state("domcontentloaded")
             await asyncio.sleep(1.5)
 
-            # 2. Select Post Type (e.g. 'for sale by owner')
-            print(f"[{payload.id}] Selecting post type: {payload.type_of_post}")
-            await self._select_radio_option(page, payload.type_of_post)
-            await self._click_continue(page)
+            # 2. Dynamic multi-step category / sub-area navigation
+            max_nav_steps = 7
+            nav_step = 0
+            while nav_step < max_nav_steps:
+                nav_step += 1
+                await asyncio.sleep(1.2)
 
-            # 3. Handle optional Sub-area navigation (if city has subareas like SF Bay Area or NYC)
-            if payload.sub_area:
-                print(f"[{payload.id}] Selecting sub-area: {payload.sub_area}")
-                await asyncio.sleep(1.0)
-                selected_sub = await self._select_radio_option(page, payload.sub_area)
-                if selected_sub:
+                # Check if we already reached the main form
+                if await page.locator("#PostingTitle, input[name='PostingTitle']").count() > 0:
+                    print(f"[{payload.id}] Reached main posting form!")
+                    break
+
+                page_html = (await page.content()).lower()
+
+                # Step: Post Type selection ("what type of posting is this")
+                if "what type of posting is this" in page_html:
+                    print(f"[{payload.id}] Selecting post type: {payload.type_of_post}")
+                    selected = await self._select_radio_option(page, payload.type_of_post)
+                    if selected:
+                        await self._click_continue(page)
+                    continue
+
+                # Step: Sub-area selection ("which of these areas" / "sub-area")
+                if ("which of these areas" in page_html or "sub-area" in page_html or "nearest you" in page_html) and payload.sub_area:
+                    print(f"[{payload.id}] Selecting sub-area: {payload.sub_area}")
+                    selected = await self._select_radio_option(page, payload.sub_area)
+                    if selected:
+                        await self._click_continue(page)
+                    continue
+
+                # Step: Category selection ("choose a category")
+                if "choose a category" in page_html or "select a category" in page_html:
+                    print(f"[{payload.id}] Selecting category: {payload.category}")
+                    selected = await self._select_radio_option(page, payload.category)
+                    if selected:
+                        await self._click_continue(page)
+                    continue
+
+                # Check if there is an intermediate continue button
+                if await page.locator("button.continue, button[name='go'], input[name='go']").count() > 0:
+                    print(f"[{payload.id}] Advancing through intermediate step...")
                     await self._click_continue(page)
+                else:
+                    break
 
-            # 4. Select Category
-            print(f"[{payload.id}] Selecting category: {payload.category}")
-            await asyncio.sleep(1.0)
-            await self._select_radio_option(page, payload.category)
-            await self._click_continue(page)
-
-            # 5. Populate Main Post Form
+            # 3. Populate Main Post Form
             print(f"[{payload.id}] Filling post payload...")
-            await page.wait_for_selector("#PostingTitle, input[name='PostingTitle']", state="visible", timeout=15000)
+            await page.wait_for_selector("#PostingTitle, input[name='PostingTitle']", state="visible", timeout=20000)
 
             # Title
             await HumanActions.human_type(page, "#PostingTitle, input[name='PostingTitle']", spun_title)
