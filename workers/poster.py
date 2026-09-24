@@ -234,6 +234,35 @@ class CraigslistPosterWorker:
             await page.wait_for_selector(body_sel, state="visible")
             await HumanActions.human_type(page, body_sel, spun_body)
 
+            # Guest Email (required when not logged in)
+            email_sel = "input[name='FromEMail'], #FromEMail"
+            if await page.locator(email_sel).count() > 0:
+                contact_email = None
+                if account and account.email and "@" in account.email and account.email != "stored_session@local":
+                    contact_email = account.email
+                else:
+                    import os
+                    from dotenv import load_dotenv
+                    load_dotenv()
+                    contact_email = os.getenv("CL_ACCOUNT_2_EMAIL") or os.getenv("CL_ACCOUNT_1_EMAIL") or "chrisconcannon@protonmail.com"
+
+                print(f"[{payload.id}] Supplying contact email: {contact_email}")
+                await HumanActions.human_type(page, email_sel, contact_email)
+                confirm_sel = "input[name='FromEMailConfirm'], #FromEMailConfirm"
+                if await page.locator(confirm_sel).count() > 0:
+                    await HumanActions.human_type(page, confirm_sel, contact_email)
+
+            # Phone / Text contact options
+            if payload.phone_number:
+                phone_check_sel = "input[name='contact_phone_ok'], #contact_phone_ok, label:has-text('show my phone number') input"
+                if await page.locator(phone_check_sel).count() > 0:
+                    await page.locator(phone_check_sel).first.check(force=True)
+                    await asyncio.sleep(0.3)
+
+                phone_input_sel = "input[name='contact_phone'], #contact_phone"
+                if await page.locator(phone_input_sel).count() > 0:
+                    await HumanActions.human_type(page, phone_input_sel, payload.phone_number)
+
             # Optional Attributes (Condition, Delivery, etc.)
             if payload.attributes.condition:
                 cond_sel = "select[name='condition']"
