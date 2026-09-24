@@ -1,151 +1,285 @@
-# Craigslist Poster Pro 🚀
+# Craigslist Poster & Lead Engine Pro 🚀
 
-A scalable, stealth automated Craigslist posting engine built with **Playwright**, anti-detect browser signatures, recursive spintax generation, EXIF metadata sanitization, sticky proxy routing, and intelligent rate limiting.
+[![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
+[![Playwright](https://img.shields.io/badge/engine-Playwright%20Stealth-green.svg)](https://playwright.dev/)
+[![Database](https://img.shields.io/badge/database-PostgreSQL%20%2F%20Neon-00E599.svg)](https://neon.tech/)
+[![License](https://img.shields.io/badge/license-MIT-purple.svg)](LICENSE)
 
-Synthesizes the best architecture from:
-- `notmike101/craigslist-poster`: Spintax rotation, payload schema, DOM navigation.
-- `alex1115alex/CraigslistBot`: Account lifecycle, retry resilience, automated IMAP email confirmation.
-- `bunlongheng/cl-poster`: Modern Playwright engine, stealth browser context, cooldown timers, batch queueing.
+An enterprise-grade, stealth automated Craigslist posting, lead capture, and campaign engine. Built with **Playwright Stealth**, dynamic multi-city metro routing, instant copy-paste form filling, automated ZIP code verification, recursive spintax variation, EXIF image metadata sanitization, and persistent session state handling.
 
 ---
 
-## 🏗️ 1. Architecture Overview
+## 📑 Table of Contents
+1. [System Overview & Architecture](#-system-overview--architecture)
+2. [External Services & What Needs to Be Connected](#-external-services--what-needs-to-be-connected)
+3. [Environment Configuration (`.env`)](#-environment-configuration-env)
+4. [File & Project Structure](#-file--project-structure)
+5. [Quickstart & Execution Guide](#-quickstart--execution-guide)
+6. [Multi-City Campaign Management](#-multi-city-campaign-management)
+7. [Stealth & Anti-Detection Engineering](#-stealth--anti-detection-engineering)
+8. [Troubleshooting & Gotchas](#-troubleshooting--gotchas)
+
+---
+
+## 🏗️ System Overview & Architecture
+
+The engine automates the entire lifecycle of multi-metro ad distribution and lead capture:
 
 ```mermaid
 graph TD
-    A[CLI / Queue / API] --> B[Payload & Spintax Engine]
-    B -->|Spin Titles & Bodies| C[Post Worker]
-    D[Image Assets] -->|Strip EXIF / Metadata| E[ExifScrubber]
+    A[Campaign Config: campaign_multicity.json] --> B[Spintax & Payload Engine]
+    B -->|Generates Unique Ads| C[Craigslist Poster Worker]
+    
+    D[Account Sessions: data/sessions/] -->|Cookies & LocalStorage| E[Stealth Browser Context]
+    F[Residential Proxy Provider] -->|Sticky Metro IPs| E
     E --> C
-    F[Session Manager] -->|Cookies & LocalStorage| G[Stealth Browser Factory]
-    H[Proxy Manager] -->|Sticky IP per Account| G
-    G --> C
-    I[Rate Limiter & Cooldown] -->|Enforce Pacing & Jitter| C
-    C -->|Form Traversal & Human Inputs| J[Craigslist Platform]
-    K[Email Verifier - IMAP] -.->|Confirmation Links| J
+    
+    C -->|Bypass Copy-From-Previous| G[Area Dropdown Selector]
+    G -->|Metro Routing: LA, Miami, NYC, etc.| H[Sub-Area & Category Picker]
+    H -->|Instant Copy-Paste Form Fill| I[Verified Main Form + ZIP]
+    I -->|Advance Past Location Map| J[Preview Screen]
+    J -->|Publish Live| K[Published Ad Receipt + Screenshot]
+    
+    K --> L[(Database: Neon PostgreSQL)]
+    M[Inbound Inquiries: Text/Call] --> N[Lead Pipeline: leads.json / leads.csv]
 ```
 
-### Modular Directory Structure
+---
+
+## 🔌 External Services & What Needs to Be Connected
+
+To take this engine from local testing to a fully autonomous 24/7 cloud operation, connect the following 6 components:
+
+### 1. Database Layer: Neon (Serverless PostgreSQL)
+* **Status**: Connectable via `neonctl` and `DATABASE_URL`.
+* **Purpose**: Stores campaign runs, published URLs, lead responses, spintax history, and account metrics.
+* **How to Connect**:
+  1. Retrieve your connection string from the Neon Console (`console.neon.tech`).
+  2. Set `DATABASE_URL="postgresql://user:password@ep-xyz.neon.tech/neondb?sslmode=require"` in `.env`.
+  3. Install Neon CLI in PowerShell: `npm install -g neonctl && neonctl auth`.
+
+### 2. Craigslist Account & Session State
+* **Status**: Ready and pre-configured for `pinnacleaisoulutions@gmail.com`.
+* **Purpose**: Bypasses Craigslist guest email verification links and avoids login CAPTCHAs on every run.
+* **How to Connect**:
+  - Run the visual session generator to log in or refresh your cookies:
+    ```bash
+    python login.py
+    ```
+  - State files are automatically encrypted and stored in `data/sessions/default_state.json`.
+
+### 3. Residential / Mobile Proxy Network (Optional for Scale)
+* **Status**: Configurable in `config/default_config.yaml`.
+* **Purpose**: Prevents IP-level Craigslist rate limits, shadowbans, and geographic mismatch flags when posting across multiple cities in rapid succession.
+* **Recommended Providers**: Bright Data, Oxylabs, Smartproxy, or Webshare.
+* **Setup**:
+  - Use sticky residential sessions pinned to the target city (e.g. Miami IP for `miami`, LA IP for `losangeles`).
+  - Add proxy credentials to `.env`:
+    ```env
+    PROXY_SERVER=http://pr.oxylabs.io:7777
+    PROXY_USERNAME=customer-xyz-city-losangeles
+    PROXY_PASSWORD=secret
+    ```
+
+### 4. SMS / Voice Forwarding & Inbound Relay
+* **Status**: Configured in campaign template (`default_contact.phone`).
+* **Purpose**: Handles inbound inquiries from creators/leads while protecting your private phone number.
+* **Setup**:
+  - Use a dedicated virtual business line: **OpenPhone**, **Twilio**, or **Telnyx**.
+  - Current campaign route: `(617) 792-8254`.
+
+### 5. Email Forwarding / IMAP Listener (For Guest Posting)
+* **Status**: Scaffolded in `workers/email_verifier.py`.
+* **Purpose**: If posting without a logged-in Craigslist account, Craigslist emails an activation link. The IMAP worker monitors your inbox, extracts the link, and triggers publication automatically.
+* **Setup**:
+  - Supply your email IMAP credentials in `.env` (`IMAP_HOST`, `IMAP_USER`, `IMAP_PASS`).
+
+### 6. GitHub Actions / Cloud Run (Scheduled Cron Pacing)
+* **Status**: Ready for CI/CD deployment.
+* **Purpose**: Automatically cycles through scheduled cities every few hours without needing a local terminal open.
+
+---
+
+## ⚙️ Environment Configuration (`.env`)
+
+Create a `.env` file in the root directory:
+
+```env
+# ==========================================
+# DATABASE (NEON POSTGRESQL)
+# ==========================================
+DATABASE_URL=postgresql://user:password@ep-cool-mountain.neon.tech/neondb?sslmode=require
+NEON_API_KEY=neon_api_key_xxxxxxxxxxxx
+
+# ==========================================
+# PROXY CONFIGURATION (OPTIONAL)
+# ==========================================
+USE_PROXY=false
+PROXY_SERVER=http://residential-proxy.example.com:8000
+PROXY_USERNAME=proxy_user
+PROXY_PASSWORD=proxy_pass
+
+# ==========================================
+# IMAP EMAIL CONFIRMATION (GUEST POSTING)
+# ==========================================
+IMAP_HOST=imap.gmail.com
+IMAP_PORT=993
+IMAP_USER=pinnacleaisoulutions@gmail.com
+IMAP_PASS=your_app_password_here
+
+# ==========================================
+# BROWSER & PACING SETTINGS
+# ==========================================
+HEADLESS=true
+PACING_COOLDOWN_MINUTES=5
+```
+
+---
+
+## 📁 File & Project Structure
 
 ```text
-craigslist-poster/
+craigslistautoposter/
 ├── config/
-│   ├── settings.py           # Pydantic configuration loader
-│   └── default_config.yaml   # Config file for pacing, stealth, & proxies
+│   ├── settings.py             # Pydantic environment configuration loader
+│   └── default_config.yaml     # Pacing, rate limits, and browser settings
 ├── core/
-│   ├── browser.py            # Playwright stealth factory + human typing & bezier curves
-│   ├── session.py            # Cookie and storage-state persistence manager
-│   ├── proxy.py              # Sticky proxy session manager (Oxylabs, Bright Data, etc.)
-│   └── rate_limiter.py       # Cooldown enforcement & rate pacing manager
+│   ├── browser.py              # Stealth Playwright browser factory
+│   ├── session.py              # Cookie and storage_state persistence engine
+│   ├── proxy.py                # Residential proxy routing
+│   └── rate_limiter.py         # Cooldown enforcement & anti-detection delays
 ├── payload/
-│   ├── models.py             # Pydantic models for PostPayload, Account, JobResult
-│   ├── spintax.py            # Recursive nested Spintax parser & variant generator
-│   └── exif_scrubber.py      # EXIF metadata cleaner & image re-encoder
+│   ├── models.py               # PostPayload, AccountCredentials, JobResult models
+│   ├── spintax.py              # Recursive Spintax generator (unlimited nested levels)
+│   └── exif_scrubber.py        # EXIF metadata sanitization and re-encoding
 ├── workers/
-│   ├── poster.py             # Primary Craigslist posting worker with selector fallbacks
-│   └── email_verifier.py     # Automated IMAP email confirmation listener
+│   ├── poster.py               # Core posting worker: navigation, form fill, ZIP verification
+│   └── email_verifier.py       # IMAP automated confirmation link listener
 ├── data/
-│   ├── sessions/             # Cached session states & cookies (.json)
-│   ├── templates/            # JSON post templates with spintax
-│   └── images/               # Raw and processed images
-├── tests/
-│   ├── test_spintax.py       # Unit tests for spintax parser
-│   └── test_exif.py          # Unit tests for image scrubber
-├── main.py                   # Unified CLI runner (dry-run, post, spin, clean-images)
-├── pyproject.toml            # Project packaging specification
-├── requirements.txt          # Python dependencies
-└── README.md                 # System documentation & architectural plan
+│   ├── sessions/               # Saved session tokens (default_state.json)
+│   ├── templates/              # Campaign templates (campaign_multicity.json)
+│   └── images/                 # Processed and cleaned image assets
+├── post_silver_rose.py         # Multi-city command runner (--city-index, --publish)
+├── login.py                    # Interactive session generator & cookie saver
+├── menu.py                     # Rich terminal interactive dashboard
+├── pyproject.toml              # Dependencies & packaging metadata
+└── README.md                   # System documentation
 ```
 
 ---
 
-## 📋 2. Step-by-Step Implementation Plan
+## 🚀 Quickstart & Execution Guide
 
-### Phase 1: Core Setup & Dependency Hardening
-- [x] Configure Playwright with Chromium stealth flags (`--disable-blink-features=AutomationControlled`, randomized viewport profiles, dynamic user-agents).
-- [x] Integrate `playwright-stealth` and JavaScript evasion scripts (overriding `navigator.webdriver`, `chrome.runtime`, `navigator.languages`).
-- [x] Implement human-like interaction heuristics:
-  - Character-by-character typing with Gaussian randomized delays.
-  - Organic cursor movement using Quadratic Bézier curves with micro-jitter.
+### 1. Prerequisites & Installation
+Ensure you have **Python 3.10+** and **Node.js** installed:
 
-### Phase 2: Content Obfuscation & Image Sanitization
-- [x] Build recursive `SpintaxParser` supporting unlimited bracket nesting (e.g. `{Top {tier|quality}|Premium} item`).
-- [x] Implement `ExifScrubber` using Pillow to wipe GPS, camera serials, timestamps, and re-encode images to reset perceptual image hashing.
+```powershell
+# Clone or navigate to the repository
+cd C:\Users\futur\gemini_workspace\craigslistautoposter
 
-### Phase 3: Session Persistence & Proxy Routing
-- [x] Implement `SessionManager` to load/save Playwright storage state (`storage_state.json`) per account.
-- [x] Build `ProxyManager` to support residential/mobile proxy endpoints with account-sticky session IDs.
-
-### Phase 4: Posting Workflow Navigation & Resilient Selectors
-- [x] Implement dynamic posting path:
-  1. Subdomain entry (`https://{city}.craigslist.org/`) -> Craigslist Post selector.
-  2. Post category selection (`for sale by owner`, `services`, `housing`).
-  3. Sub-area navigation (for multi-region metros like SF Bay Area or NYC).
-  4. Specific subcategory selection (`electronics`, `furniture`, `general`).
-  5. Form population with robust multi-selector fallbacks (`#PostingTitle`, text-matching, regex).
-  6. Location / Map confirmation screen bypass.
-  7. Automated image upload with sanitized assets.
-  8. Preview inspection & Dry-Run simulation.
-  9. Final publication with confirmation receipt & error logging.
-
-### Phase 5: Safety Layer & Rate Limiting
-- [x] Implement `RateLimiter` with jittered cooldown intervals between posts and maximum daily limits.
-- [x] Provide automated IMAP `EmailVerifier` to handle Craigslist email-confirmation links when guest posting.
-
----
-
-## ⚡ 3. Quickstart & Usage
-
-### Installation
-
-```bash
-# Clone the repository
-git clone <your-repo-url>
-cd craigslist-poster
-
-# Create a virtual environment
+# Create and activate virtual environment
 python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+.venv\Scripts\activate
 
-# Install dependencies and Playwright browser
+# Install dependencies and Playwright Chromium
 pip install -r requirements.txt
 playwright install chromium
 ```
 
-### Control Panel & Session Management
+### 2. Login & Save Session (One-Time Setup)
+```powershell
+python login.py
+```
+* Opens a visual Chromium window.
+* Log in to your Craigslist account.
+* The script detects successful login and automatically writes session state to `data/sessions/default_state.json`.
 
-#### Interactive Control Panel
-Launch the visual interactive terminal menu:
+### 3. Launch the Interactive Dashboard
 ```powershell
 python menu.py
 ```
+Provides an interactive menu to test campaigns, inspect session states, preview spintax, or trigger live publications.
 
-#### One-Time Login Session Saver
-Establish a persistent authenticated session so the browser stays logged in across all future runs:
+---
+
+## 🌐 Multi-City Campaign Management
+
+The campaign configuration is defined in [`data/templates/campaign_multicity.json`](data/templates/campaign_multicity.json). Target cities are indexed in priority order:
+
+| Index | Metro Subdomain | City | Sub-Area | Target Postal Code |
+| :---: | :--- | :--- | :--- | :---: |
+| **0** | `losangeles` | Los Angeles, CA | Central LA | `90012` |
+| **1** | `miami` | Miami / South Florida | Miami / Dade County | `33101` |
+| **2** | `newyork` | New York City, NY | Manhattan | `10001` |
+| **3** | `houston` | Houston, TX | Downtown | `77002` |
+| **4** | `chicago` | Chicago, IL | Loop / City of Chicago | `60601` |
+
+### Terminal Commands
+
+#### Dry-Run Preview (Safe Verification)
+Generates the spintax ad, navigates the selectors, fills the form, verifies the ZIP code, bypasses the map, and saves a preview snapshot without publishing:
 ```powershell
-python save_session.py
+# Preview Miami (City #2)
+python post_silver_rose.py --city-index 1 --headless
+
+# Preview Los Angeles (City #1)
+python post_silver_rose.py --city-index 0 --headless
 ```
 
-#### Run Dry-Run Preview Test
+#### Live Publication
+Navigates the complete flow and clicks the **Publish** button, saving the live confirmation URL and receipt screenshot:
 ```powershell
-python dry_run_harness.py
-```
+# Publish City 1 (Los Angeles)
+python post_silver_rose.py --city-index 0 --publish
 
-#### Preview Spintax Variations
-```powershell
-python main.py spin --text "{Brand New|Factory Sealed} {iPhone 15|Galaxy S24} {Ready for pickup|Local cash}" --count 4
-```
+# Publish City 2 (Miami)
+python post_silver_rose.py --city-index 1 --publish
 
-#### Run Unit Tests
-```powershell
-python -m unittest discover -s tests
+# Publish City 3 (New York City)
+python post_silver_rose.py --city-index 2 --publish
+
+# Publish City 4 (Houston)
+python post_silver_rose.py --city-index 3 --publish
+
+# Publish City 5 (Chicago)
+python post_silver_rose.py --city-index 4 --publish
 ```
 
 ---
 
-## 🛡️ Anti-Bot & Operational Best Practices
+## 🛡️ Stealth & Anti-Detection Engineering
 
-1. **Proxy Hygiene**: Always use clean residential or mobile proxies (e.g. Bright Data, Oxylabs, Soax) pinned to the geographical area/city of the target Craigslist subdomain.
-2. **Pacing**: Maintain at least 3-7 minutes of randomized cooldown between successive posts on the same IP.
-3. **Spintax Depth**: Keep your spintax tree deep enough so that no two ads have greater than 30% lexical overlap.
-4. **Image Uniqueness**: Avoid stock photos. Always pass images through the `ExifScrubber` before uploading.
+This engine solves the classic pitfalls of Craigslist browser automation:
+
+1. **Copy-Paste Form Filling**:
+   - Rather than slow character-by-character typing which triggers field timeouts on long bodies, the engine utilizes atomic `page.fill(...)` with DOM event dispatching (`input`, `change`) for sub-second form completion.
+2. **Guaranteed Postal / ZIP Code Verification**:
+   - Accurately targets `#postal_code` and `input[name='postal']`, performs an immediate input value read-back check, and applies DOM-level event injection if Craigslist attempts to clear the field.
+3. **Automated Area Dropdown Mapping**:
+   - Automatically handles the Craigslist `s=area` routing trap where unhandled dropdowns default to Aberdeen, UK. Mapped directly:
+     - `miami` &rarr; `south florida`
+     - `losangeles` &rarr; `los angeles`
+     - `newyork` &rarr; `new york city`
+4. **Copy-From-Previous Bypass**:
+   - Automatically detects and clicks `[skip]` on the *"Re-use selected data from your previous posting"* screen to ensure each city is posted with fresh, targeted metro criteria.
+5. **EXIF Metadata Cleansing**:
+   - Every image uploaded passes through Pillow to wipe GPS geolocation, device serial numbers, and camera signatures.
+
+---
+
+## 🔧 Troubleshooting & Gotchas
+
+* **Craigslist Missing ZIP code warning**:
+  - Always verify that the target city is correctly mapped in the area dropdown before the form screen. UK/international markets reject standard 5-digit US ZIP codes.
+* **Session Expired**:
+  - If Craigslist prompts for email verification despite a saved session, rerun `python login.py` to refresh your authentication tokens.
+* **Headless vs Visual**:
+  - To watch the browser in real-time for debugging, omit `--headless`:
+    ```powershell
+    python post_silver_rose.py --city-index 1
+    ```
+
+---
+
+## ⚖️ License & Disclaimer
+This software is provided for educational and business workflow automation purposes. Ensure your usage adheres to the terms of service of the target platform and applicable local regulations.
