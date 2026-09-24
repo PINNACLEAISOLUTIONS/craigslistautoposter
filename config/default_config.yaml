@@ -1,0 +1,22 @@
+browser:
+  headless: false
+  slow_mo_ms: 70
+  timeout_ms: 35000
+  human_typing_min_delay_ms: 40
+  human_typing_max_delay_ms: 130
+  enable_cursor_jitter: true
+  viewport_width: 1366
+  viewport_height: 768
+
+rate_limits:
+  min_post_interval_seconds: 180
+  max_post_interval_seconds: 360
+  max_posts_per_day: 12
+  jitter_factor: 0.20
+
+proxy:
+  enabled: false
+  server: "http://pr.oxylabs.io:7777"
+  username: "your_proxy_user"
+  password: "your_proxy_password"
+  sticky_session: true

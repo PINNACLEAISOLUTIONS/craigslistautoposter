@@ -1,0 +1,18 @@
+{
+  "id": "post-electronics-01",
+  "subdomain": "sfbay",
+  "type_of_post": "for sale by owner",
+  "sub_area": "city of san francisco",
+  "category": "electronics - by owner",
+  "title_spintax": "{Brand New|Sealed in Box|Unopened} Apple iPhone 15 Pro Max {256GB|512GB} - {Natural|Blue} Titanium",
+  "body_spintax": "{Hello|Hi there|Good morning},\n\nI have an {authentic|original|brand-new} iPhone 15 Pro Max available for sale.\n{Includes all standard retail packaging and cable|Factory sealed with warranty}.\n\nPrice is {firm|negotiable within reason}.\n{Cash only upon local meet|In-person transaction in public spot}.\n\n{Feel free to reach out with questions|Text or message anytime}.\n\nThank you!",
+  "price": "980",
+  "postal_code": "94103",
+  "neighborhood": "SOMA / Downtown",
+  "attributes": {
+    "condition": "new",
+    "make_manufacturer": "Apple",
+    "model_name_number": "A3106"
+  },
+  "images": []
+}
