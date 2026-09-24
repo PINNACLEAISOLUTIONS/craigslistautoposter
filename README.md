@@ -112,31 +112,33 @@ pip install -r requirements.txt
 playwright install chromium
 ```
 
-### Running Commands
+### Control Panel & Session Management
 
-#### 1. Preview Spintax Variations
-```bash
+#### Interactive Control Panel
+Launch the visual interactive terminal menu:
+```powershell
+python menu.py
+```
+
+#### One-Time Login Session Saver
+Establish a persistent authenticated session so the browser stays logged in across all future runs:
+```powershell
+python save_session.py
+```
+
+#### Run Dry-Run Preview Test
+```powershell
+python dry_run_harness.py
+```
+
+#### Preview Spintax Variations
+```powershell
 python main.py spin --text "{Brand New|Factory Sealed} {iPhone 15|Galaxy S24} {Ready for pickup|Local cash}" --count 4
 ```
 
-#### 2. Test Dry-Run Mode (Safe simulation up to Preview page, with screenshot saved to `data/dry_run_*.png`)
-```bash
-python main.py dry-run --payload data/templates/sample_post.json
-```
-
-#### 3. Execute Live Post
-```bash
-python main.py post --payload data/templates/sample_post.json
-```
-
-#### 4. Clean & Scrub EXIF from Images
-```bash
-python main.py clean-images --images path/to/photo1.jpg path/to/photo2.png
-```
-
-#### 5. Run Unit Tests
-```bash
-pytest tests/
+#### Run Unit Tests
+```powershell
+python -m unittest discover -s tests
 ```
 
 ---
