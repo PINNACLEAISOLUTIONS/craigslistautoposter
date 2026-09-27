@@ -16,7 +16,7 @@ rate_limits:
 
 proxy:
   enabled: false
-  server: "http://pr.oxylabs.io:7777"
-  username: "your_proxy_user"
-  password: "your_proxy_password"
+  server: "http://198.23.243.226:6361"
+  username: "fairsqzl"
+  password: "79htwfpnbelx"
   sticky_session: true

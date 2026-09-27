@@ -1,3 +1,5 @@
+import os
+from pathlib import Path
 import asyncio
 import math
 import random
@@ -29,6 +31,7 @@ class BrowserFactory:
         self.config = config or BrowserConfig()
         self._playwright = None
         self._browser: Optional[Browser] = None
+        self._obscura_process = None
 
     async def initialize(self):
         if self._playwright is None:
@@ -52,11 +55,45 @@ class BrowserFactory:
             "--disable-dev-shm-usage",
         ]
 
-        self._browser = await self._playwright.chromium.launch(
-            headless=self.config.headless,
-            slow_mo=self.config.slow_mo_ms,
-            args=launch_args
-        )
+        # --- Obscura Stealth Engine CDP Integration ---
+        import socket
+        obscura_running = False
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(0.6)
+                if s.connect_ex(('127.0.0.1', 9222)) == 0:
+                    obscura_running = True
+        except Exception:
+            pass
+
+        obscura_bin = Path(__file__).resolve().parent.parent.parent / "obscura" / "bin" / "obscura.exe"
+        use_obscura_pref = os.getenv("USE_OBSCURA", "true").lower() in ("true", "1", "yes", "auto")
+
+        # Auto-launch Obscura if not running and binary exists
+        if not obscura_running and obscura_bin.exists() and use_obscura_pref:
+            try:
+                import subprocess
+                print(f"[Browser] 🚀 Auto-launching Obscura Stealth CDP Server on port 9222...")
+                self._obscura_process = subprocess.Popen(
+                    [str(obscura_bin), "serve", "--stealth", "--port", "9222"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                )
+                await asyncio.sleep(1.8)
+                obscura_running = True
+            except Exception as e:
+                print(f"[Browser] Failed to auto-launch Obscura: {e}")
+
+        if obscura_running and use_obscura_pref:
+            print("[Browser] 🛡️ Connected to Obscura Stealth Browser over CDP (ws://127.0.0.1:9222)...")
+            self._browser = await self._playwright.chromium.connect_over_cdp("http://127.0.0.1:9222")
+        else:
+            print("[Browser] 🌐 Launching standard Playwright Chromium...")
+            self._browser = await self._playwright.chromium.launch(
+                headless=self.config.headless,
+                slow_mo=self.config.slow_mo_ms,
+                args=launch_args
+            )
 
         context_kwargs = {
             "viewport": viewport,

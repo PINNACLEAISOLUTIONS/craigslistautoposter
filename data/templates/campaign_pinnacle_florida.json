@@ -1,0 +1,115 @@
+{
+  "campaign_name": "Pinnacle AI Solutions - Florida Statewide Automation",
+  "default_contact": {
+    "phone": "904-686-6593",
+    "email": "pinnacleaisoulutions@gmail.com",
+    "website": "https://tinyurl.com/pinnacle-ai-solutions"
+  },
+  "content": {
+    "title_spintax": "{Pinnacle AI Solutions \u2014 Custom Agents For Any Task & Web Scrapers|Pinnacle AI Solutions \u2014 Custom AI Agents & Web Scraper Software|Custom AI Agents For Any Task \u2014 Facebook & Craigslist Auto-Posters|Pinnacle AI Solutions \u2014 Automated Scrapers & Custom Bot Development}",
+    "body_spintax": "Stop wasting time on manual data entry, repetitive tasks, and outdated workflows. Pinnacle AI Solutions builds custom automation infrastructure, high-converting websites, and automated lead generation systems designed to scale local businesses.\n\nWe can build custom AI agents for ANY task \u2014 matching your exact workflow and business needs from scratch.\n\n\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\u2605 WHAT WE BUILD FOR YOUR BUSINESS:\n\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\n\ud83e\udd16 CUSTOM AI AGENTS FOR ANY TASK\n\u2022 We can build custom AI agents for ANY task or process in your business.\n\u2022 Automate customer intake, document processing, database updates, and internal workflows.\n\u2022 Eliminates manual computer work and frees up hours of your time every day.\n\n\ud83d\udcf1 FACEBOOK SCRAPERS & POSTERS\n\u2022 Facebook Group Scrapers: Automatically search and monitor targeted Facebook Groups for active customer inquiries and buyer leads.\n\u2022 Facebook Marketplace Scrapers: Track inventory, find deals, and capture customer opportunities.\n\u2022 Automated Facebook Posters: Schedule and publish your posts across pages and groups hands-free.\n\n\ud83d\udce2 CRAIGSLIST SCRAPERS & AUTO-POSTERS\n\u2022 Automated Craigslist Poster: Hands-free multi-city ad distribution with scheduled pacing to keep your ads active.\n\u2022 Craigslist Lead Scrapers: Automatically pull inbound gigs, client requests, and hiring leads straight into your spreadsheets or CRM.\n\n\ud83d\udcde AI PHONE & VOICE RECEPTIONISTS\n\u2022 Never miss a customer call, inquiry, or booking.\n\u2022 Natural, human-sounding voice agents that answer questions and schedule appointments 24/7.\n\n\ud83d\ude80 MODERN WEBSITES & HIGH-CONVERTING FUNNELS\n\u2022 Lightning-fast, mobile-responsive websites built to turn visitors into paying customers.\n\nStop doing grunt work that code can handle for you.\n\n\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\u2605 GET A FREE ESTIMATE & LIVE DEMO:\n\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\ud83d\udcde Call or Text: (904) 686-6593\n\ud83d\udccd Florida Based \u2014 Fast Turnaround & Direct Support",
+    "computer_title_spintax": "{Pinnacle AI Solutions \u2014 Custom Agents For Any Task & Web Scrapers|Pinnacle AI Solutions \u2014 Custom AI Agents & Web Scraper Software|Custom AI Agents For Any Task \u2014 Facebook & Craigslist Auto-Posters|Pinnacle AI Solutions \u2014 Automated Scrapers & Custom Bot Development}"
+  },
+  "targets": [
+    {
+      "city": "Jacksonville",
+      "subdomain": "jacksonville",
+      "type_of_post": "community",
+      "categories": [
+        "artists"
+      ],
+      "postal_code": "32202",
+      "neighborhood": "Downtown / Beaches"
+    },
+    {
+      "city": "Orlando",
+      "subdomain": "orlando",
+      "type_of_post": "for sale by owner",
+      "categories": [
+        "computers"
+      ],
+      "postal_code": "32801",
+      "neighborhood": "Downtown / Metro"
+    },
+    {
+      "city": "Tampa Bay",
+      "subdomain": "tampa",
+      "type_of_post": "community",
+      "categories": [
+        "artists"
+      ],
+      "postal_code": "33602",
+      "neighborhood": "Tampa / St. Pete"
+    },
+    {
+      "city": "Miami / South Florida",
+      "subdomain": "miami",
+      "type_of_post": "for sale by owner",
+      "categories": [
+        "computers"
+      ],
+      "postal_code": "33101",
+      "neighborhood": "Miami / Brickell"
+    },
+    {
+      "city": "Fort Myers / Cape Coral",
+      "subdomain": "fortmyers",
+      "type_of_post": "community",
+      "categories": [
+        "artists"
+      ],
+      "postal_code": "33901",
+      "neighborhood": "Fort Myers / Cape Coral"
+    },
+    {
+      "city": "Sarasota / Bradenton",
+      "subdomain": "sarasota",
+      "type_of_post": "for sale by owner",
+      "categories": [
+        "computers"
+      ],
+      "postal_code": "34236",
+      "neighborhood": "Sarasota / Bradenton"
+    },
+    {
+      "city": "Daytona Beach",
+      "subdomain": "daytona",
+      "type_of_post": "community",
+      "categories": [
+        "artists"
+      ],
+      "postal_code": "32114",
+      "neighborhood": "Daytona Beach"
+    },
+    {
+      "city": "Space Coast / Melbourne",
+      "subdomain": "spacecoast",
+      "type_of_post": "for sale by owner",
+      "categories": [
+        "computers"
+      ],
+      "postal_code": "32901",
+      "neighborhood": "Melbourne / Palm Bay"
+    },
+    {
+      "city": "Gainesville",
+      "subdomain": "gainesville",
+      "type_of_post": "community",
+      "categories": [
+        "artists"
+      ],
+      "postal_code": "32601",
+      "neighborhood": "Gainesville / Alachua"
+    },
+    {
+      "city": "Tallahassee",
+      "subdomain": "tallahassee",
+      "type_of_post": "for sale by owner",
+      "categories": [
+        "computers"
+      ],
+      "postal_code": "32301",
+      "neighborhood": "Tallahassee / Leon"
+    }
+  ]
+}

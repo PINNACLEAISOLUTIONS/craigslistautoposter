@@ -50,3 +50,5 @@ test_*.py
 inspect_*.py
 scratch_*.py
 check_*.py
+
+data/proxies.json
