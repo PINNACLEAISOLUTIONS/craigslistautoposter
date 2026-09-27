@@ -462,7 +462,7 @@ if __name__ == "__main__":
     parser.add_argument("--publish", action="store_true", help="Publish live (default: preview dry-run)")
     parser.add_argument("--continuous", action="store_true", help="Run full continuous rotation across sub-categories and sections")
     parser.add_argument("--interval-mins", type=int, default=60, help="Interval between posts in minutes (default: 60)")
-    parser.add_argument("--sub-area", default="city of chicago", choices=list(CHICAGO_SUB_AREAS.keys()), help="Single sub-area")
+    parser.add_argument("--sub-area", default="city of chicago", choices=list(CHICAGO_SUB_AREAS_DICT.keys()), help="Single sub-area")
     parser.add_argument("--category", default="activity partners", choices=CATEGORIES_TO_ROTATE, help="Single category")
     parser.add_argument("--start-step", type=int, default=0, help="Step index to start rotation at (0-based)")
     args = parser.parse_args()
